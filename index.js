@@ -11,6 +11,7 @@ const mailgun = require('mailgun-js')({
     domain: domain,
   });
 
+  let emailStatus='success';
 
 
 exports.handler = async function (event) {
@@ -28,6 +29,8 @@ exports.handler = async function (event) {
       const email = parsedMessage.email
       const { submission_url, user_id, assignment_id } = parsedMessage
 
+      const SenderEmail=process.env.emailId;
+
  
       const downloadUrl = 'https://github.com/tparikh/myrepo/archive/refs/tags/v1.0.0.zip';
     
@@ -38,11 +41,12 @@ exports.handler = async function (event) {
 
         if (!response.ok) {
             await recordEmailEvent("failure",email);
+            const errorMessage = response.statusText || `HTTP Error: ${response.status}`;
             const emailData = {
-                from: "no-reply@demo.sumeetdeshpande.me",
+                from: SenderEmail,
                 to:  email,
                 subject: 'Download Failed',
-                text: 'Your file has been failed uploaded to the GCP Bucket. Issue with Downloading URL'
+                text: `Your file has been failed uploaded to the GCP Bucket. Issue with Downloading URL ${errorMessage}`
               };
             await sendEmail(mailgun, emailData);
             return "file not uploaed";
@@ -67,7 +71,7 @@ exports.handler = async function (event) {
         await uploadFileToGCS(bucketName,filename,response.body,parsedMessage);
         const signedurl=await generateSignedUrl(storage,bucketName,filename);
         const emailData = {
-          from: "no-reply@demo.sumeetdeshpande.me",
+          from: SenderEmail,
           to: email,
           subject: 'Download Success',
           html: `
@@ -92,10 +96,10 @@ exports.handler = async function (event) {
         console.error('Error:', error);
         await recordEmailEvent("failure",email);
         const emailData = {
-            from: "no-reply@demo.sumeetdeshpande.me",
+            from: SenderEmail,
             to: email,
             subject: 'Download Failed',
-            text: 'Your file has been failed uploaded to GCP Bucket'
+            text: `Your file has been failed uploaded to GCP Bucket ${error}`
           };
         await sendEmail(mailgun, emailData);
         return "file not uploaed";
@@ -178,6 +182,7 @@ async function recordEmailEvent(status,email) {
         status: status,
         timestamp: new Date().toISOString(),
         email:email,
+        sentdtatus:emailStatus,
       },
     };
    
