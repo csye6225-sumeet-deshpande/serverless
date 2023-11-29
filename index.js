@@ -3,7 +3,7 @@ const {Storage}=require('@google-cloud/storage')
 const fetch=require('node-fetch');
 aws.config.update({ region: "us-east-1" });
 const docClient = new aws.DynamoDB.DocumentClient();
-const apiKey = 'e14522788fcb16be615fd71529535909-5d2b1caa-0ab7b7cc';
+const apiKey = process.env.apiKey;
 const domain = 'demo.sumeetdeshpande.me';
 const host="demo.sumeetdeshpande.me";
 const mailgun = require('mailgun-js')({
@@ -41,39 +41,60 @@ exports.handler = async function (event) {
             const emailData = {
                 from: "no-reply@demo.sumeetdeshpande.me",
                 to:  email,
-                subject: 'File Uploaded Notification',
-                text: 'Your file has been failed uploaded to S3'
+                subject: 'Download Failed',
+                text: 'Your file has been failed uploaded to GCP Bucket'
               };
             await sendEmail(mailgun, emailData);
+            return "file not uploaed";
           }
-        const emailData = {
-            from: "no-reply@demo.sumeetdeshpande.me",
-            to: email,
-            subject: 'File Uploaded Notification',
-            text: 'Your file has been uploaded to S3 successfully.'
-          };
+          else{
+            await recordEmailEvent("success");
+        
           
      
         console.log("Sending Email");
         const bucketName=process.env.gcsBucket;
+        const gcpServiceAccountKeyFile = Buffer.from(process.env.gcp_pk, 'base64').toString('utf-8');;
+        const gcpCredentials = JSON.parse(gcpServiceAccountKeyFile);
+       
+        const storage = new Storage({
+          projectId: process.env.projectId,
+          credentials: gcpCredentials, 
+      });
+      const folderPath = `${user_id}/${assignment_id}`;
+      const timestamp = new Date().toISOString().replace(/[-T:.Z]/g, '');
+      const filename=`${folderPath}/my-file-${timestamp}.zip`;
+        await uploadFileToGCS(bucketName,filename,response.body,parsedMessage);
+        const signedurl=await generateSignedUrl(storage,bucketName,filename);
+        const emailData = {
+          from: "no-reply@demo.sumeetdeshpande.me",
+          to: email,
+          subject: 'Download Success',
+          text: `Your file has been uploaded to GCP Bucket successfully. ${signedurl}`
+        };
         await sendEmail(mailgun, emailData);
-        await uploadFileToGCS(bucketName,'my-file.zip',response.body,parsedMessage);
-        await recordEmailEvent("success");
-        return ;
+        return "file  uploaed";
+          }
       } catch (error) {
         console.error('Error:', error);
         await recordEmailEvent("failure");
         const emailData = {
             from: "no-reply@demo.sumeetdeshpande.me",
             to: email,
-            subject: 'File Uploaded Notification',
-            text: 'Your file has been failed uploaded to S3'
+            subject: 'Download Failed',
+            text: 'Your file has been failed uploaded to GCP Bucket'
           };
         await sendEmail(mailgun, emailData);
-        throw error;
+        return "file not uploaed";
+      }
+
+      finally{
+        return{
+          status:200
+        }
       }
   
-
+   
   };
 
 
@@ -85,12 +106,29 @@ async function sendEmail(mailgun, data) {
         
         } else {
           resolve(body);
-          recordEmailEvent("success");
         }
       });
     });
 }
 
+
+async function generateSignedUrl(storage, bucketName, fileName) {
+  const options = {
+    action: "read",
+    expires: Date.now() + 15 * 60 * 1000, // 15 minutes
+  };
+ 
+  try {
+    const [url] = await storage
+      .bucket(bucketName)
+      .file(fileName)
+      .getSignedUrl(options);
+    return url;
+  } catch (err) {
+    console.error("Error generating signed URL:", err);
+    throw err;
+  }
+}
 
 async function uploadFileToGCS(bucketName, fileName, stream,parsedMessage) {
     const email = parsedMessage.email
@@ -105,8 +143,8 @@ async function uploadFileToGCS(bucketName, fileName, stream,parsedMessage) {
       credentials: gcpCredentials, 
   });
   
-   
-    const file = storage.bucket(bucketName).file(`${folderPath}/${fileName}`);
+  const timestamp = new Date().toISOString().replace(/[-T:.Z]/g, '');
+    const file = storage.bucket(bucketName).file(fileName);
     const writeStream = file.createWriteStream();
   
     return new Promise((resolve, reject) => {
