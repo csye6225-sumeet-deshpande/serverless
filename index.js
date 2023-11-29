@@ -70,7 +70,20 @@ exports.handler = async function (event) {
           from: "no-reply@demo.sumeetdeshpande.me",
           to: email,
           subject: 'Download Success',
-          text: `Your file has been uploaded to GCP Bucket successfully. ${signedurl}`
+          html: `
+    <html>
+      <head>
+      </head>
+      <body>
+        <p>Hi,</p>
+        <p>Thank you for uploading with us. Please click on the below link to download your assignment:</p>
+        <p>BucketNAME:${bucketName} Path on GCP File : ${filename}
+        <p>Thanks for submit!</p>
+        <p>Thank you</p>
+        <p>Sumeet</p>
+      </body>
+    </html>
+  `,
         };
         await sendEmail(mailgun, emailData);
         return "file  uploaed";
