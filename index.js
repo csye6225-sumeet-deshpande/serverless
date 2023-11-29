@@ -37,7 +37,7 @@ exports.handler = async function (event) {
         const response = await fetch(submission_url); 
 
         if (!response.ok) {
-            await recordEmailEvent("failure");
+            await recordEmailEvent("failure",email);
             const emailData = {
                 from: "no-reply@demo.sumeetdeshpande.me",
                 to:  email,
@@ -48,7 +48,7 @@ exports.handler = async function (event) {
             return "file not uploaed";
           }
           else{
-            await recordEmailEvent("success");
+            await recordEmailEvent("success",email);
         
           
      
@@ -90,7 +90,7 @@ exports.handler = async function (event) {
           }
       } catch (error) {
         console.error('Error:', error);
-        await recordEmailEvent("failure");
+        await recordEmailEvent("failure",email);
         const emailData = {
             from: "no-reply@demo.sumeetdeshpande.me",
             to: email,
@@ -170,13 +170,14 @@ async function uploadFileToGCS(bucketName, fileName, stream,parsedMessage) {
     });
   }
 
-async function recordEmailEvent(status) {
+async function recordEmailEvent(status,email) {
     const params = {
       TableName: process.env.dbName,
       Item: {
         id: Date.now().toString(),
         status: status,
         timestamp: new Date().toISOString(),
+        email:email,
       },
     };
    
