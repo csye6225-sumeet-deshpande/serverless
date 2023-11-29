@@ -42,7 +42,7 @@ exports.handler = async function (event) {
                 from: "no-reply@demo.sumeetdeshpande.me",
                 to:  email,
                 subject: 'Download Failed',
-                text: 'Your file has been failed uploaded to GCP Bucket'
+                text: 'Your file has been failed uploaded to the GCP Bucket'
               };
             await sendEmail(mailgun, emailData);
             return "file not uploaed";
